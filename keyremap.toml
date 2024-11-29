@@ -1,0 +1,29 @@
+version = "1.0"
+name = "配置1"
+comment = "DF的按键映射配置"
+
+[[key_mappings]]
+name = "Pause转Insert"
+comment = "暂停键转Insert"
+from.key = "Pause"
+to.key = "Insert"
+
+[[key_mappings]]
+name = "D转E"
+enable = false
+from.key = "KeyD"
+to.key = "KeyE"
+
+[[key_mappings]]
+name = "E转D"
+enable = false
+from.key = "KeyE"
+to.key = "KeyD"
+
+[[key_mappings]]
+name = "鼠标侧键转Ctrl+W"
+from.button.Unknown = 2
+to.combination = [
+    { key = "ControlLeft" },
+    { key = "KeyW" }
+]
