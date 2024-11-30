@@ -69,8 +69,8 @@ pub fn remap_main() {
         for mapping in &config.key_mappings {
             info!("Mapping: {}", mapping.name);
             info!("  enabled: {}", mapping.enable);
-            info!("  from: {:?}", mapping.from);
-            info!("  to: {:?}", mapping.to);
+            info!("  from: {}", mapping.from);
+            info!("  to: {}", mapping.to);
         }
         return;
     }

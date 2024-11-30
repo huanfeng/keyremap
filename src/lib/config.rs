@@ -1,3 +1,5 @@
+use std::fmt;
+
 use rdev::{Button, Key};
 use serde::Deserialize;
 
@@ -34,6 +36,18 @@ pub struct InputEvent {
     pub button: Option<Button>,
 }
 
+impl fmt::Display for InputEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(ref key_value) = self.key {
+            write!(f, "key: {:?}", key_value)
+        } else if let Some(ref button_value) = self.button {
+            write!(f, "button: {:?}", button_value)
+        } else {
+            write!(f, "none")
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct OutputEvent {
     #[serde(default)]
@@ -42,9 +56,32 @@ pub struct OutputEvent {
     pub combination: Option<Vec<KeyDef>>,
 }
 
+impl fmt::Display for OutputEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(ref combination_value) = self.combination {
+            let string = combination_value
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
+            write!(f, "combination: [{}]", string)
+        } else if let Some(ref key_value) = self.key {
+            write!(f, "key: {:?}", key_value)
+        } else {
+            write!(f, "none")
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct KeyDef {
     pub key: Key,
+}
+
+impl fmt::Display for KeyDef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "key: {:?}", self.key)
+    }
 }
 
 impl InputEvent {
