@@ -22,3 +22,6 @@ path = "src/main.rs"
 debug = false
 lto = true
 panic = "abort"
+
+[features]
+no_console = []
