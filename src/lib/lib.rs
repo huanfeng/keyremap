@@ -1,12 +1,13 @@
 mod config;
+mod windows_service;
 mod windows_singleton;
 
 use clap::Parser;
 use log::{debug, error, info, LevelFilter};
 use rdev::{grab, listen, simulate, Event, EventType, Key};
+use std::fs;
 use std::path::PathBuf;
 use std::{env, thread, time::Duration};
-use std::fs;
 
 use config::{Config, KeyMapping};
 
@@ -21,7 +22,7 @@ struct Args {
     #[arg(short, action = clap::ArgAction::Count, help = "Set log level, ex: -v, -vv")]
     verbose: u8,
 
-    #[arg(short, long, help = "Write log to file (keyremap.log)")]
+    #[arg(long, help = "Write log to file (keyremap.log)")]
     logfile: bool,
 
     #[arg(long, help = "Listen mode")]
@@ -29,10 +30,20 @@ struct Args {
 
     #[arg(long, help = "Dump config")]
     dump: bool,
+
+    #[arg(long, help = "Install Windows service")]
+    install_service: bool,
+
+    #[arg(long, help = "Uninstall Windows service")]
+    uninstall_service: bool,
+
+    #[arg(long, help = "Run as Windows service")]
+    service: bool,
 }
 
 pub fn remap_main() {
     let args = Args::parse();
+
     let exe_path = env::current_exe().unwrap();
     let exe_dir = exe_path.parent().unwrap();
 
@@ -43,7 +54,12 @@ pub fn remap_main() {
         _ => LevelFilter::Trace,
     };
 
-    if args.logfile {
+    if args.logfile || args.service {
+        let log_level = if args.service {
+            LevelFilter::Debug
+        } else {
+            log_level
+        };
         let log_file = std::fs::File::create(exe_dir.join("keyremap.log")).unwrap();
         env_logger::Builder::new()
             .filter_level(log_level)
@@ -51,6 +67,30 @@ pub fn remap_main() {
             .init();
     } else {
         env_logger::Builder::new().filter_level(log_level).init();
+    }
+
+    if args.install_service {
+        match windows_service::install_service() {
+            Ok(_) => info!("Service installed successfully"),
+            Err(e) => error!("Failed to install service: {}", e),
+        }
+        return;
+    }
+
+    if args.uninstall_service {
+        match windows_service::uninstall_service() {
+            Ok(_) => info!("Service uninstalled successfully"),
+            Err(e) => error!("Failed to uninstall service: {}", e),
+        }
+        return;
+    }
+
+    if args.service {
+        match windows_service::run_service() {
+            Ok(_) => (),
+            Err(e) => error!("Service error: {}", e),
+        }
+        return;
     }
 
     if args.listen {
@@ -66,21 +106,32 @@ pub fn remap_main() {
         exe_dir.join("keyremap.toml")
     };
 
+    if args.dump {
+        dump_config(&config_path);
+    }
+
+    // 主入口
+    remap_main_loop(&config_path);
+}
+
+fn dump_config(config_path: &PathBuf) {
+    let config: Config = load_config(config_path).unwrap();
+
+    info!("Dumping config:");
+    for mapping in &config.key_mappings {
+        info!("Mapping: {}", mapping.name);
+        info!("  enabled: {}", mapping.enable);
+        info!("  from: {}", mapping.from);
+        info!("  to: {}", mapping.to);
+    }
+    return;
+}
+
+fn remap_main_loop(config_path: &PathBuf) {
     info!("Loading config: {:?}", config_path);
 
     // 读取配置文件
-    let config = load_config(&config_path).unwrap();
-
-    if args.dump {
-        info!("Dumping config:");
-        for mapping in &config.key_mappings {
-            info!("Mapping: {}", mapping.name);
-            info!("  enabled: {}", mapping.enable);
-            info!("  from: {}", mapping.from);
-            info!("  to: {}", mapping.to);
-        }
-        return;
-    }
+    let config: Config = load_config(&config_path).unwrap();
 
     #[cfg(target_os = "windows")]
     if !windows_singleton::ensure_single_instance(MUTEX_NAME) {
