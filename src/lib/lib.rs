@@ -5,25 +5,27 @@ use log::{debug, error, info, LevelFilter};
 use rdev::{grab, simulate, Event, EventType, Key};
 use std::fs;
 use std::path::PathBuf;
-use std::{thread, time::Duration};
+use std::{env, thread, time::Duration};
 
 use config::{Config, KeyMapping};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "keyremap.toml")]
-    config: PathBuf,
+    #[arg(short, long, help = "Path to toml config file, default: keyremap.toml")]
+    config: Option<PathBuf>,
 
-    #[arg(short, action = clap::ArgAction::Count)]
+    #[arg(short, action = clap::ArgAction::Count, help = "Set log level, ex: -v, -vv")]
     verbose: u8,
 
-    #[arg(short, long, help = "log to file")]
+    #[arg(short, long, help = "Write log to file (keyremap.log)")]
     logfile: bool,
 }
 
 pub fn remap_main() {
     let args = Args::parse();
+    let exe_path = env::current_exe().unwrap();
+    let exe_dir = exe_path.parent().unwrap();
 
     // 设置日志级别
     let log_level = match args.verbose {
@@ -33,7 +35,7 @@ pub fn remap_main() {
     };
 
     if args.logfile {
-        let log_file = std::fs::File::create("keyremap.log").unwrap();
+        let log_file = std::fs::File::create(exe_dir.join("keyremap.log")).unwrap();
         env_logger::Builder::new()
             .filter_level(log_level)
             .target(env_logger::Target::Pipe(Box::new(log_file)))
@@ -44,10 +46,16 @@ pub fn remap_main() {
 
     info!("=== KeyRemap start ===");
 
-    info!("Loading config: {:?}", args.config);
+    let config_path = if let Some(config_path) = args.config {
+        config_path
+    } else {
+        exe_dir.join("keyremap.toml")
+    };
+
+    info!("Loading config: {:?}", config_path);
 
     // 读取配置文件
-    let config = load_config(&args.config).unwrap();
+    let config = load_config(&config_path).unwrap();
 
     info!("Listening for key mappings:");
     for mapping in &config.key_mappings {
