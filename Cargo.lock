@@ -345,6 +345,7 @@ dependencies = [
  "rdev",
  "serde",
  "toml",
+ "windows-sys",
 ]
 
 [[package]]

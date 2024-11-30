@@ -1,4 +1,5 @@
 mod config;
+mod windows_singleton;
 
 use clap::Parser;
 use log::{debug, error, info, LevelFilter};
@@ -8,6 +9,8 @@ use std::path::PathBuf;
 use std::{env, thread, time::Duration};
 
 use config::{Config, KeyMapping};
+
+static MUTEX_NAME: &str = "KeyremapSingleInstance";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -44,8 +47,6 @@ pub fn remap_main() {
         env_logger::Builder::new().filter_level(log_level).init();
     }
 
-    info!("=== KeyRemap start ===");
-
     let config_path = if let Some(config_path) = args.config {
         config_path
     } else {
@@ -56,6 +57,13 @@ pub fn remap_main() {
 
     // 读取配置文件
     let config = load_config(&config_path).unwrap();
+    
+    #[cfg(target_os = "windows")]
+    if !windows_singleton::ensure_single_instance(MUTEX_NAME) {
+        return;
+    }
+
+    info!("=== KeyRemap start ===");
 
     info!("Listening for key mappings:");
     for mapping in &config.key_mappings {
