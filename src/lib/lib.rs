@@ -3,10 +3,10 @@ mod windows_singleton;
 
 use clap::Parser;
 use log::{debug, error, info, LevelFilter};
-use rdev::{grab, simulate, Event, EventType, Key};
-use std::fs;
+use rdev::{grab, listen, simulate, Event, EventType, Key};
 use std::path::PathBuf;
 use std::{env, thread, time::Duration};
+use std::fs;
 
 use config::{Config, KeyMapping};
 
@@ -24,11 +24,11 @@ struct Args {
     #[arg(short, long, help = "Write log to file (keyremap.log)")]
     logfile: bool,
 
-    #[arg(long, help = "Study mode")]
-    study: bool,
+    #[arg(long, help = "Listen mode")]
+    listen: bool,
 
-    #[arg(long, help = "Check config")]
-    check: bool,
+    #[arg(long, help = "Dump config")]
+    dump: bool,
 }
 
 pub fn remap_main() {
@@ -53,6 +53,13 @@ pub fn remap_main() {
         env_logger::Builder::new().filter_level(log_level).init();
     }
 
+    if args.listen {
+        info!("=== KeyRemap LISTEN ===");
+        info!("Press Ctrl+C to exit\n");
+        key_listen_loop();
+        return;
+    }
+
     let config_path = if let Some(config_path) = args.config {
         config_path
     } else {
@@ -64,8 +71,8 @@ pub fn remap_main() {
     // 读取配置文件
     let config = load_config(&config_path).unwrap();
 
-    if args.check {
-        info!("Checking configuration file:");
+    if args.dump {
+        info!("Dumping config:");
         for mapping in &config.key_mappings {
             info!("Mapping: {}", mapping.name);
             info!("  enabled: {}", mapping.enable);
@@ -75,19 +82,12 @@ pub fn remap_main() {
         return;
     }
 
-    if args.study {
-        info!("=== KeyRemap study ===");
-        info!("Press Ctrl+C to exit\n");
-        key_handle_loop(Config::default(), true);
-        return;
-    }
-
     #[cfg(target_os = "windows")]
     if !windows_singleton::ensure_single_instance(MUTEX_NAME) {
         return;
     }
 
-    info!("=== KeyRemap start ===");
+    info!("=== KeyRemap START ===");
 
     info!("Listening for key mappings:");
     for mapping in &config.key_mappings {
@@ -97,14 +97,14 @@ pub fn remap_main() {
     }
     info!("Press Ctrl+C to exit\n");
 
-    key_handle_loop(config, false);
+    key_handle_loop(config);
 }
 
 fn load_config(path: &PathBuf) -> Option<Config> {
     let config = match fs::read_to_string(path) {
         Ok(content) => match toml::from_str::<Config>(&content) {
             Ok(config) => {
-                debug!("Configuration content: {:?}", config);
+                debug!("Config content: {:?}", config);
                 config
             }
             Err(e) => {
@@ -120,41 +120,45 @@ fn load_config(path: &PathBuf) -> Option<Config> {
     Some(config)
 }
 
-fn key_handle_loop(config: Config, study: bool) {
+fn key_listen_loop() {
+    if let Err(error) = listen(move |event: Event| -> () {
+        match event.event_type {
+            EventType::MouseMove { .. } => {}
+            EventType::KeyPress(_) | EventType::KeyRelease(_) => {
+                info!("Key: {:?}", event.event_type);
+            }
+            EventType::ButtonPress(_) | EventType::ButtonRelease(_) => {
+                info!("MouseButton: {:?}", event.event_type);
+            }
+            _ => debug!("Other: {:?} | Time: {:?}", event.event_type, event.time),
+        }
+    }) {
+        error!("Capture error: {:?}", error);
+    }
+}
+
+fn key_handle_loop(config: Config) {
     if let Err(error) = grab(move |event: Event| -> Option<Event> {
         match event.event_type {
             EventType::MouseMove { .. } => {}
             EventType::KeyPress(_) | EventType::KeyRelease(_) => {
-                if study {
-                    info!("Key: {:?}", event.event_type);
-                } else {
-                    debug!("Key: {:?} | Time: {:?}", event.event_type, event.time);
-                }
+                debug!("Key: {:?} | Time: {:?}", event.event_type, event.time);
             }
             EventType::ButtonPress(_) | EventType::ButtonRelease(_) => {
-                if study {
-                    info!("MouseButton: {:?}", event.event_type);
-                } else {
-                    debug!(
-                        "MouseButton: {:?}, | Time: {:?}",
-                        event.event_type, event.time
-                    );
-                }
+                debug!(
+                    "MouseButton: {:?}, | Time: {:?}",
+                    event.event_type, event.time
+                );
             }
-            _ => debug!(
-                "Other: {:?} | Time: {:?}",
-                event.event_type, event.time
-            ),
+            _ => debug!("Other: {:?} | Time: {:?}", event.event_type, event.time),
         }
 
-        if !study {
-            for mapping in &config.key_mappings {
-                if !mapping.enable {
-                    continue;
-                };
-                if process_mapping(mapping, &event) {
-                    return None;
-                }
+        for mapping in &config.key_mappings {
+            if !mapping.enable {
+                continue;
+            };
+            if process_mapping(mapping, &event) {
+                return None;
             }
         }
         Some(event)
