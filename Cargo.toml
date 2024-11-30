@@ -10,3 +10,15 @@ toml = "0.8.19"
 log = "0.4"
 env_logger = "0.11.5"
 clap = { version = "4.4", features = ["derive"] }
+
+[lib]
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "keyremap"
+path = "src/main.rs"
+
+[profile.release]
+debug = false
+lto = true
+panic = "abort"
