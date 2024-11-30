@@ -23,6 +23,12 @@ struct Args {
 
     #[arg(short, long, help = "Write log to file (keyremap.log)")]
     logfile: bool,
+
+    #[arg(long, help = "Study mode")]
+    study: bool,
+
+    #[arg(long, help = "Check config")]
+    check: bool,
 }
 
 pub fn remap_main() {
@@ -57,7 +63,25 @@ pub fn remap_main() {
 
     // 读取配置文件
     let config = load_config(&config_path).unwrap();
-    
+
+    if args.check {
+        info!("Checking configuration file:");
+        for mapping in &config.key_mappings {
+            info!("Mapping: {}", mapping.name);
+            info!("  enabled: {}", mapping.enable);
+            info!("  from: {:?}", mapping.from);
+            info!("  to: {:?}", mapping.to);
+        }
+        return;
+    }
+
+    if args.study {
+        info!("=== KeyRemap study ===");
+        info!("Press Ctrl+C to exit\n");
+        key_handle_loop(Config::default(), true);
+        return;
+    }
+
     #[cfg(target_os = "windows")]
     if !windows_singleton::ensure_single_instance(MUTEX_NAME) {
         return;
@@ -73,7 +97,7 @@ pub fn remap_main() {
     }
     info!("Press Ctrl+C to exit\n");
 
-    key_handle_loop(config);
+    key_handle_loop(config, false);
 }
 
 fn load_config(path: &PathBuf) -> Option<Config> {
@@ -96,34 +120,41 @@ fn load_config(path: &PathBuf) -> Option<Config> {
     Some(config)
 }
 
-fn key_handle_loop(config: Config) {
+fn key_handle_loop(config: Config, study: bool) {
     if let Err(error) = grab(move |event: Event| -> Option<Event> {
         match event.event_type {
             EventType::MouseMove { .. } => {}
             EventType::KeyPress(_) | EventType::KeyRelease(_) => {
-                debug!(
-                    "Captured key event: {:?} | Time: {:?}",
-                    event.event_type, event.time
-                );
+                if study {
+                    info!("Key: {:?}", event.event_type);
+                } else {
+                    debug!("Key: {:?} | Time: {:?}", event.event_type, event.time);
+                }
             }
             EventType::ButtonPress(_) | EventType::ButtonRelease(_) => {
-                debug!(
-                    "Captured button event: {:?}, | Time: {:?}",
-                    event.event_type, event.time
-                );
+                if study {
+                    info!("MouseButton: {:?}", event.event_type);
+                } else {
+                    debug!(
+                        "MouseButton: {:?}, | Time: {:?}",
+                        event.event_type, event.time
+                    );
+                }
             }
             _ => debug!(
-                "Captured other event: {:?} | Time: {:?}",
+                "Other: {:?} | Time: {:?}",
                 event.event_type, event.time
             ),
         }
 
-        for mapping in &config.key_mappings {
-            if !mapping.enable {
-                continue;
-            };
-            if process_mapping(mapping, &event) {
-                return None;
+        if !study {
+            for mapping in &config.key_mappings {
+                if !mapping.enable {
+                    continue;
+                };
+                if process_mapping(mapping, &event) {
+                    return None;
+                }
             }
         }
         Some(event)

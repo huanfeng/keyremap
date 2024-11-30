@@ -1,7 +1,7 @@
 use rdev::{Button, Key};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Config {
     pub version: String,
     #[serde(default)]
