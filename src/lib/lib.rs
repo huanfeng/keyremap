@@ -1,5 +1,7 @@
 mod config;
+#[cfg(target_os = "windows")]
 mod windows_service;
+#[cfg(target_os = "windows")]
 mod windows_singleton;
 
 use clap::Parser;
@@ -11,6 +13,7 @@ use std::{env, thread, time::Duration};
 
 use config::{Config, KeyMapping};
 
+#[cfg(target_os = "windows")]
 static MUTEX_NAME: &str = "KeyremapSingleInstance";
 
 #[derive(Parser, Debug)]
@@ -31,12 +34,15 @@ struct Args {
     #[arg(long, help = "Dump config")]
     dump: bool,
 
+    #[cfg(target_os = "windows")]
     #[arg(long, help = "Install Windows service")]
     install_service: bool,
 
+    #[cfg(target_os = "windows")]
     #[arg(long, help = "Uninstall Windows service")]
     uninstall_service: bool,
 
+    #[cfg(target_os = "windows")]
     #[arg(long, help = "Run as Windows service")]
     service: bool,
 }
@@ -54,12 +60,18 @@ pub fn remap_main() {
         _ => LevelFilter::Trace,
     };
 
-    if args.logfile || args.service {
-        let log_level = if args.service {
-            LevelFilter::Debug
-        } else {
-            log_level
-        };
+    #[cfg(target_os = "windows")]
+    let log_level = if args.service {
+        LevelFilter::Trace
+    } else {
+        log_level
+    };
+    #[cfg(target_os = "windows")]
+    let log_file = if args.service { true } else { args.logfile };
+    #[cfg(not(target_os = "windows"))]
+    let log_file = args.logfile;
+
+    if log_file {
         let log_file = std::fs::File::create(exe_dir.join("keyremap.log")).unwrap();
         env_logger::Builder::new()
             .filter_level(log_level)
@@ -69,28 +81,31 @@ pub fn remap_main() {
         env_logger::Builder::new().filter_level(log_level).init();
     }
 
-    if args.install_service {
-        match windows_service::install_service() {
-            Ok(_) => info!("Service installed successfully"),
-            Err(e) => error!("Failed to install service: {}", e),
+    #[cfg(target_os = "windows")]
+    {
+        if args.install_service {
+            match windows_service::install_service() {
+                Ok(_) => info!("Service installed successfully"),
+                Err(e) => error!("Failed to install service: {}", e),
+            }
+            return;
         }
-        return;
-    }
 
-    if args.uninstall_service {
-        match windows_service::uninstall_service() {
-            Ok(_) => info!("Service uninstalled successfully"),
-            Err(e) => error!("Failed to uninstall service: {}", e),
+        if args.uninstall_service {
+            match windows_service::uninstall_service() {
+                Ok(_) => info!("Service uninstalled successfully"),
+                Err(e) => error!("Failed to uninstall service: {}", e),
+            }
+            return;
         }
-        return;
-    }
 
-    if args.service {
-        match windows_service::run_service() {
-            Ok(_) => (),
-            Err(e) => error!("Service error: {}", e),
+        if args.service {
+            match windows_service::run_service() {
+                Ok(_) => (),
+                Err(e) => error!("Service error: {}", e),
+            }
+            return;
         }
-        return;
     }
 
     if args.listen {
