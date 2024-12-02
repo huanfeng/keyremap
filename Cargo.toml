@@ -10,7 +10,11 @@ toml = "0.8.19"
 log = "0.4"
 env_logger = "0.11.5"
 clap = { version = "4.4", features = ["derive"] }
-windows-sys = { version = "0.59.0", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_Security"] }
+windows-sys = { version = "0.59.0", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
 
 [lib]
 path = "src/lib/lib.rs"

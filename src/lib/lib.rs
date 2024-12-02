@@ -1,12 +1,15 @@
 mod config;
+#[cfg(target_os = "windows")]
+mod windows_console;
+#[cfg(target_os = "windows")]
 mod windows_singleton;
 
 use clap::Parser;
 use log::{debug, error, info, LevelFilter};
 use rdev::{grab, listen, simulate, Event, EventType, Key};
+use std::fs;
 use std::path::PathBuf;
 use std::{env, thread, time::Duration};
-use std::fs;
 
 use config::{Config, KeyMapping};
 
@@ -21,14 +24,18 @@ struct Args {
     #[arg(short, action = clap::ArgAction::Count, help = "Set log level, ex: -v, -vv")]
     verbose: u8,
 
-    #[arg(short, long, help = "Write log to file (keyremap.log)")]
+    #[arg(long, help = "Write log to file (keyremap.log)")]
     logfile: bool,
 
-    #[arg(long, help = "Listen mode")]
+    #[arg(short, long, help = "Listen mode")]
     listen: bool,
 
     #[arg(long, help = "Dump config")]
     dump: bool,
+
+    #[cfg(target_os = "windows")]
+    #[arg(short, long, help = "Daemon mode")]
+    daemon: bool,
 }
 
 pub fn remap_main() {
@@ -96,6 +103,11 @@ pub fn remap_main() {
         };
     }
     info!("Press Ctrl+C to exit\n");
+
+    #[cfg(target_os = "windows")]
+    if args.daemon {
+        windows_console::free_console();
+    }
 
     key_handle_loop(config);
 }
