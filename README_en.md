@@ -162,3 +162,9 @@ Issues and Pull Requests are welcome!
 
 3. Q: How to temporarily disable a mapping?  
    A: Add `enable = false` to the corresponding mapping configuration.
+
+4. Q: Mapping doesn't work in some interfaces?  
+   A: If the application is running without administrator privileges, it won't work for windows with administrator privileges.
+
+5. Q: System freezes when pressing Pause in --listen mode?  
+   A: This issue might be caused by Windows Hook, currently no solution. If this happens, use Ctrl + Shift + Del to open Task Manager and kill the process to recover. Also, avoid pressing the Pause key during debugging.
