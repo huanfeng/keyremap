@@ -193,6 +193,19 @@ fn simulate_key(key: Key, is_press: bool) {
     }
 }
 
+fn simulate_combination(combination: Vec<Key>) {
+    // 按顺序按下所有键
+    for key in &combination {
+        simulate_key(*key, true);
+    }
+    thread::sleep(Duration::from_millis(20));
+    // 按相反顺序释放按键
+    for key in combination.iter().rev() {
+        simulate_key(*key, false);
+    }
+}
+
+// 返回 true 表示事件已经被处理, 屏蔽按键
 fn process_mapping(mapping: &KeyMapping, event: &Event) -> bool {
     // 检查输入事件是否匹配
     let matches_input = match event.event_type {
@@ -211,17 +224,8 @@ fn process_mapping(mapping: &KeyMapping, event: &Event) -> bool {
     match event.event_type {
         EventType::KeyPress(_) | EventType::ButtonPress(_) => {
             // 处理按键按下事件
-            if let Some(combination) = mapping.to.get_combination() {
-                debug!("Simulate key combination: {:#?}", combination);
-                // 按顺序按下所有键
-                for key in &combination {
-                    simulate_key(*key, true);
-                }
-                thread::sleep(Duration::from_millis(20));
-                // 按相反顺序释放按键
-                for key in combination.iter().rev() {
-                    simulate_key(*key, false);
-                }
+            if let Some(_) = mapping.to.get_combination() {
+                debug!("Has combination ignore key, deal later...");
                 true
             } else if let Some(key) = mapping.to.key {
                 simulate_key(key, true);
@@ -232,10 +236,11 @@ fn process_mapping(mapping: &KeyMapping, event: &Event) -> bool {
         }
         EventType::KeyRelease(_) | EventType::ButtonRelease(_) => {
             // 如果是组合键，释放事件已经在按下时处理过了
-            if mapping.to.get_combination().is_none() {
-                if let Some(key) = mapping.to.key {
-                    simulate_key(key, false);
-                }
+            if let Some(combination) = mapping.to.get_combination() {
+                simulate_combination(combination);
+                true
+            } else if let Some(key) = mapping.to.key {
+                simulate_key(key, false);
                 true
             } else {
                 false
