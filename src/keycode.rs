@@ -106,11 +106,34 @@ pub fn input_from_name(name: &str) -> Option<Input> {
 }
 
 /// 按名字解析虚拟键码。
+///
+/// 除了 KEY_TABLE 中预定义的键名, 还支持 `VK=0xNN` 格式,
+/// 例如 `VK=0xB5`。键名和 VK 前缀均不区分大小写。
 pub fn vk_from_name(name: &str) -> Option<u16> {
-    KEY_TABLE
+    // 先查预定义键名, 例如 A、F1、MediaPlayPause 等。
+    if let Some(vk) = KEY_TABLE
         .iter()
         .find(|(n, _)| n.eq_ignore_ascii_case(name))
         .map(|(_, vk)| *vk)
+    {
+        return Some(vk);
+    }
+
+    // 再支持 VK=0xNN / vk=0xnn 格式。
+    let (prefix, value) = name.split_once('=')?;
+    if !prefix.eq_ignore_ascii_case("VK") {
+        return None;
+    }
+
+    let value = value.trim();
+    let value = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))?;
+
+    // KBDLLHOOKSTRUCT::vkCode 的有效范围是 0..=255。
+    u16::from_str_radix(value, 16)
+        .ok()
+        .filter(|vk| *vk <= 0xFF)
 }
 
 /// 反查键名, 用于 --listen 模式和日志。表只有百余项, 线性扫描足够。
