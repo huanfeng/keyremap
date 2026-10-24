@@ -272,6 +272,9 @@ fn run_session(config_path: &std::path::Path, cfg: config::Config) -> bool {
     // install 自己按配置决定要不要装鼠标钩子, 所以必须在 set_config 之后
     if let Err(e) = hook::install() {
         error!("{e}");
+        // 任务自启时没有控制台也没带 --logfile, 这条日志的去向是虚空,
+        // 静默退出就是"设了自启也不起"却无迹可寻 —— 弹个框兜底
+        tray::show_error("keyremap: 钩子安装失败", &e);
         std::process::exit(1);
     }
 
@@ -305,6 +308,9 @@ fn run_session(config_path: &std::path::Path, cfg: config::Config) -> bool {
 
     if let Err(e) = tray::init(config_path) {
         error!("{e}");
+        // 同上, 自启场景下失败必须让用户看见。show_error 用 MessageBoxW 直弹,
+        // 不依赖托盘本身, 托盘没建起来时也出得来
+        tray::show_error("keyremap: 托盘初始化失败", &e);
         hook::uninstall();
         std::process::exit(1);
     }

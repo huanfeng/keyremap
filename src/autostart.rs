@@ -52,8 +52,8 @@ const SCHTASKS_NOT_FOUND: i32 = 1;
 /// 有了版本号, [`sync`] 才知道该把旧任务重建一遍。
 ///
 /// **改动 [`task_xml`] 里任何影响行为的设置时, 把这个数加一。**
-/// 1 = 0.5.1 及之前的 schtasks 命令行方式; 2 = 现在的 XML 方式。
-const TASK_FORMAT_VERSION: u32 = 2;
+/// 1 = 0.5.1 及之前的 schtasks 命令行方式; 2 = XML 方式; 3 = 登录触发器加延迟。
+const TASK_FORMAT_VERSION: u32 = 3;
 const VALUE_TASK_VERSION: &str = "TaskFormatVersion";
 
 /// 计划任务名。带上 exe 路径的哈希, 这样复制到别处的另一份副本
@@ -305,6 +305,9 @@ fn task_xml(config_path: &Path) -> Result<String, String> {
         }
     };
 
+    // 登录触发任务是系统里最早起来的一批进程, 常抢在 explorer 建好任务栏之前;
+    // 那时往托盘加图标会失败, 而 main 把托盘初始化失败当致命错误直接退出 ——
+    // 自启就成了"设了但重启后不起"。推迟触发, 让 explorer 先就位。
     Ok(format!(
         r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -314,6 +317,7 @@ fn task_xml(config_path: &Path) -> Result<String, String> {
   <Triggers>
     <LogonTrigger>
       <Enabled>true</Enabled>{user_line}
+      <Delay>PT10S</Delay>
     </LogonTrigger>
   </Triggers>
   <Principals>
@@ -472,6 +476,14 @@ mod tests {
         assert!(xml.contains("<RunLevel>HighestAvailable</RunLevel>"));
         assert!(xml.contains("<LogonTrigger>"));
         assert!(xml.contains("<LogonType>InteractiveToken</LogonType>"));
+    }
+
+    #[test]
+    fn xml_登录触发器带延迟() {
+        // 登录瞬间 explorer 的任务栏往往还没就位, 立即触发会让托盘初始化失败,
+        // 程序退出 (见 task_xml 里 Delay 的说明)。这条保证延迟不会被顺手删掉。
+        let xml = task_xml(&paths::default_config()).unwrap();
+        assert!(xml.contains("<Delay>PT10S</Delay>"));
     }
 
     #[test]
