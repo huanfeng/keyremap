@@ -1,6 +1,6 @@
 [package]
 name = "keyremap"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2024"
 description = "Windows 键盘/鼠标重映射工具"
 license = "MIT"

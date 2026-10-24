@@ -339,7 +339,7 @@ python assets\make-icons.py    # 图标源变了：从 app_icon.ico 派生其余
 版本号有三处，发版前必须在本地对齐：`Cargo.toml` 的 `version`、`assets/app.rc` 的三个版本字段，然后跑 `.\assets\build-res.ps1` 重新生成 `app.res` 并提交。打 tag 推送即可：
 
 ```
-git tag v0.5.2 && git push origin v0.5.2
+git tag v0.5.3 && git push origin v0.5.3
 ```
 
 `release.yml` 会校验 tag、`Cargo.toml`、exe 版本资源三者一致 —— 不一致就直接失败，而不是发一个自相矛盾的包（流水线改不了预编译的 `app.res`，所以只能校验不能自动修）。
